@@ -1,0 +1,404 @@
+{
+  "name": "[Batch] RR POOH - A Chunk (sub)",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -672,
+        128
+      ],
+      "id": "2e3c5762-2fc9-494b-8172-058b491ba35d",
+      "name": "When Called"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── BBB Only Prompt (Fail-only, standalone batch) ────────────────────────────\nconst BBB_PROMPT = `You are an image-quality checker. You receive 1–3 images. Evaluate ALL images together as a set.\n\nReturn JSON only: {\"blank_blur_back\":\"Pass|Fail\"}\n\nFAIL only if EVERY image meets ALL of these:\n  1. Cannot identify what it shows — no object, no scene, no UI\n  2. No structural outline, shape, or color variation\n  3. No real scene beneath any GPS/timestamp text overlay\n\nThese are NOT Fail conditions — always treat as Pass:\n  - darkness, or blur where any structure is still visible\n  - dark-mode or light-mode app interfaces\n  - ANY app screenshot (call log, contact/dialer page, chat, map, delivery app, form) — a UI screen is identifiable content, Pass even when large parts are blank, white, or empty margin\n  - large empty or plain-colored areas surrounding visible content\n  - a screen with only one small element (e.g. a single call entry) as long as it is identifiable\n\nDefault: Pass. Fail ONLY when an image is genuinely unusable (all-black, all-white, or total blur with no discernible shape at all). One identifiable image = the entire set passes.`;\n\n// ── Evidence type guide (inject into all call prompts) ───────────────────────\nconst CALL_EVIDENCE_GUIDE = `IMPORTANT: evidence_type (Step 1) must be decided from the IMAGE CONTENT ONLY. on_hold_reason (given later in the user message) is NEVER used to classify evidence_type — it is used later, ONLY inside Step 2b, to judge whether an already-confirmed chat conversation discusses the same topic. Never let on_hold_reason influence whether something is call_log, chat, or none.\n\nStep 0 - Call-log recognition (do this FIRST, before anything else): decide whether ANY image is fundamentally a call-log/dialer screen by its OVERALL UI STRUCTURE, not just by matching words — a native phone contact/dialer page (large phone number header + ข้อความ/โทร/วิดีโอ buttons), a call-history list (entries with call icons + direction arrows + timestamps, in a plain list OR inside rounded bubbles, light mode OR dark mode), or an in-app call log (SeaTalk/LINE/WhatsApp). You must be able to recognize this layout on sight, the same way you would recognize a chat conversation on sight — this is a visual/structural judgment.\n\nAs a SUPPORTING signal only, also scan for on-screen TEXT containing any of these EXAMPLE Thai call-status phrases (this list is illustrative, NOT exhaustive — other equivalent call-related phrases you recognize also count, exact match or substring, e.g. \"สายที่โทรไม่ติด\" counts because it contains \"สายที่โทร\"): สายโทรออก, สายเรียกเข้า, สายไม่ได้รับ, สายที่โทร, เบอร์ที่โทรออก, ยังไม่ได้เชื่อมต่อ, ไม่มีการตอบรับ, บันทึกการโทร, ประวัติการโทร. List every phrase you actually see, verbatim, as \"detected_call_keywords\" (empty array if none — this CAN be empty even when the image is clearly a call-log, if no exact phrase happens to be legible; the structural judgment above still applies).\n\nHARD RULE: if the image structurally matches a call-log/dialer UI (per the recognition above) OR detected_call_keywords is non-empty, evidence_type MUST be \"call_log\". This overrides any other impression — even if a chat-like UI, message bubble, or \"ข้อความ\" button is also visible anywhere in the image. Only proceed to the chat/none decision below when NEITHER condition is true.\n\nStep 1 - Identify evidence type from all images. Decide by CONTENT, not by bubble shape or dark mode:\n\n- \"call_log\": the image is a phone call record. Classify as call_log if ANY of these appear:\n  * a phone number shown as a header together with โทร / ข้อความ / วิดีโอ (Call / Message / Video) action buttons — this is the native dialer/contact page. This is call_log EVEN IF a \"ข้อความ\" (Message) icon/button is visible — that is just a button, not an actual chat conversation. Classify as call_log even if the call-history entries below are partly cut off, blurry, or overlapped by other on-screen text.\n  * directional call arrows: up-right arrow = outgoing, down-left arrow = incoming\n  * a phone/handset icon (often green) shown beside an entry, next to a contact name/number and a time — this is a call-history list, not a message\n  * Thai call-status text such as: สายโทรออก, สายเรียกเข้า, สายไม่ได้รับ, สายที่โทร, เบอร์ที่โทรออก, ยังไม่ได้เชื่อมต่อ, ไม่มีการตอบรับ\n  * a ประวัติ (history) section listing call entries\n  A call record counts as call_log even with a SINGLE entry, even with NO duration shown, and even in DARK MODE where each entry sits inside a rounded bubble that looks like a chat message. A dark-mode call history — rounded bubbles each with a phone icon + call arrow + \"เบอร์ที่โทรออก\"/duration — is STILL call_log, NEVER chat. Duration is optional.\n\n- \"chat\": ONLY if the image is a genuine typed text conversation — back-and-forth written messages between people, containing actual message text. A screen that merely lists calls (missed/outgoing/incoming) is call_log, NEVER chat.\n\n- \"none\": neither a call record nor a typed conversation is visible (e.g. a location/scene photo, vehicle photo, or a blank/overlay-only image).\n\nDECISION ORDER — evaluate in THIS strict order across ALL 1–3 images:\n1. FIRST scan every image for a call record (call log / call history / dialer contact page, incl. in-app call logs in SeaTalk / LINE / WhatsApp). If ANY image is a call record → evidence_type = \"call_log\". Use the call_log path (Step 2a) and do NOT evaluate chat.\n2. ONLY if NO image contains a call record at all → then look for a chat conversation. If a genuine typed conversation is present → evidence_type = \"chat\" and evaluate relevance (Step 2b).\n3. If neither is present → \"none\".\nChat is a fallback, checked only when there is no call-history image anywhere. Never choose \"chat\" while a call record exists in any image.\n\nStep 2a - If evidence_type = \"call_log\":\nThe call history may show entries from multiple days. You are given on_hold_date in the user message (the delivery event's date) — only extract entries belonging to that same date:\n- If the call history shows ANY date information (an explicit date, a relative label like \"วันนี้\"/\"เมื่อวาน\", or a date section/divider above a group of entries): only extract entries whose shown date equals on_hold_date exactly. Skip entries under any other date, even if the phone number matches.\n- If NO date information is visible anywhere in the call history (no headers, no per-entry dates, no relative labels at all): the list is ordered NEWEST FIRST (top to bottom). Extract only the top-most contiguous group of entries that visually belong together (this may be more than one entry — take all of them). If there is any visual break, gap, or separation further down the list, treat everything below it as a different day and do NOT extract those entries.\n\nExtract entries meeting the above filter. For each entry:\n- phone_last4: the last 4 digits of that phone number, transcribed EXACTLY as printed. Read each digit individually, left to right, before writing it down — do not pattern-match or guess the whole number at a glance. Pay special attention to digit pairs that are easy to swap or transpose: 6 vs 9 (a 9's loop is at the top, a 6's loop is at the bottom), 0 vs 8, 1 vs 7, 3 vs 8, 5 vs 6. After transcribing, silently re-read the 4 digits a second time in the image to confirm none were swapped, reordered, or misread before finalizing phone_last4.\n- duration_sec: total seconds (e.g. \"1:23\"=83, \"0:05\"=5, \"0:01:23\"=83). A not-connected / missed / \"สายที่โทรไม่ติด\" / \"ยังไม่ได้เชื่อมต่อ\" / no-duration call = 0\n- direction: \"outgoing\" | \"incoming\" | \"unknown\". Decide from on-screen TEXT first, arrows second:\n    * outgoing: \"สายโทรออก\", \"เบอร์ที่โทรออก\", \"โทรออก\", \"สายที่โทรไม่ติด\", \"ยังไม่ได้เชื่อมต่อ\" (the user placed the call, even if it did not connect), or an up-right ↗ arrow\n    * incoming: \"สายเรียกเข้า\", \"สายไม่ได้รับ\" (an incoming missed call), or a down-left ↙ arrow\n    * unknown: direction genuinely cannot be determined\n  IMPORTANT: \"สายที่โทรไม่ติด\" / \"ยังไม่ได้เชื่อมต่อ\" is an OUTGOING call that did not connect (direction=\"outgoing\", duration_sec=0) — it is NOT an incoming call.\n- entry_date: the date shown for THIS SPECIFIC entry in the call history, converted to YYYY-MM-DD format. Thai short-date displays like \"3/7/26\" mean day/month/2-digit-year — convert assuming 20YY (e.g. \"3/7/26\" → \"2026-07-03\"). If no date is shown for this specific entry, leave entry_date as an empty string \"\". Report this for every entry regardless of the date-matching filter above — it is used downstream as a double-check, in addition to (not instead of) your own date-matching.\n- count: many call-log UIs collapse multiple repeated calls to the SAME number into ONE row, indicated by ANY visual marker showing a repeat count — this may appear as a number in parentheses e.g. \"(2)\", a badge, superscript, or explicit text like \"2 calls\"/\"โทร 2 ครั้ง\" next to the entry. Look for such an indicator and set count to that number. If the row clearly represents a single call with no repeat indicator, set count = 1. This count applies ONLY to the single row it's attached to — if the same number also appears as separate additional rows elsewhere in the log (each with their own time), report those as separate entries with their own count (usually 1) and do NOT add the badge count again to them. If uncertain whether a marker is a repeat-count indicator, explain your reasoning in the \"reason\" field rather than guessing silently.\nReturn call_screenshot_index (1/2/3) indicating which image is the call screenshot.\n\nStep 2b - If evidence_type = \"chat\":\n1. Transcribe the ACTUAL message text from every chat image — read what both sides actually wrote (Thai included). If you cannot find real typed conversation text to transcribe, evidence_type is NOT \"chat\" — go back to Step 1 and reclassify (it is likely call_log or none).\n2. From that transcript, determine what the conversation is really about.\n3. Compare that topic to the on_hold_reason given in the user message and judge relevance STRICTLY.\n4. Return call_screenshot_index (1/2/3) indicating which image is the chat screenshot.\n\nCRITICAL — do not echo on_hold_reason: chat_summary and reason must describe the SPECIFIC words you actually transcribed from the image. Never write a chat_summary/reason that merely restates or closely paraphrases on_hold_reason without being traceable to real transcribed text — if you could have written it without reading the image, it is invalid; go back and transcribe the actual message content.\n\nSet chat_relevant (boolean, NEVER null):\n- true ONLY when the transcribed messages clearly discuss the same situation as the on_hold_reason. Example: reason \"ร้านค้าไม่พร้อมนำส่งพัสดุ\" → the chat must actually be about the store not being ready / asking to postpone / parcel not prepared. Reason about customer not answering → chat must be about reaching/contacting the customer, etc.\n- false when the chat is about a DIFFERENT matter, is generic (greetings, small talk, stickers/images only, \"ok\"/\"received\"), has no readable text, or you cannot establish a clear link to the specific reason.\n\nDo NOT default to true. A chat that does not clearly match the reason topic is false. Base the decision only on the actual transcribed content, not on the mere presence of a conversation.\nAlso set chat_summary: a short phrase (in Thai or English) stating what the chat is actually about — this is your evidence for the relevance decision.`;\n\n// ── Hybrid Stage 1: classify-only prompt (call_log vs chat vs none) ───────────\nconst CLASSIFY_PROMPT = `You are an evidence-type classifier. From all provided images, decide ONLY what type of evidence is present. Do NOT extract call entries or transcribe chat text — that happens in a separate step. Just classify.\n\nStep 0 - Call-log recognition (do this FIRST, before anything else): decide whether ANY image is fundamentally a call-log/dialer screen by its OVERALL UI STRUCTURE, not just by matching words — a native phone contact/dialer page (large phone number header + ข้อความ/โทร/วิดีโอ buttons), a call-history list (entries with call icons + direction arrows + timestamps, in a plain list OR inside rounded bubbles, light mode OR dark mode), or an in-app call log (SeaTalk/LINE/WhatsApp). You must be able to recognize this layout on sight, the same way you would recognize a chat conversation on sight — this is a visual/structural judgment.\n\nAs a SUPPORTING signal only, also scan for on-screen TEXT containing any of these EXAMPLE Thai call-status phrases (illustrative, NOT exhaustive; other equivalent phrases also count, exact match or substring): สายโทรออก, สายเรียกเข้า, สายไม่ได้รับ, สายที่โทร, เบอร์ที่โทรออก, ยังไม่ได้เชื่อมต่อ, ไม่มีการตอบรับ, บันทึกการโทร, ประวัติการโทร. List every phrase you actually see, verbatim, as \"detected_call_keywords\" (empty array if none).\n\nHARD RULE: if the image structurally matches a call-log/dialer UI (per the recognition above) OR detected_call_keywords is non-empty, evidence_type MUST be \"call_log\". This overrides any other impression — even if a chat-like UI, message bubble, or \"ข้อความ\" button is also visible anywhere in the image. Only decide chat/none when NEITHER condition is true.\n\n- \"call_log\": phone number header + โทร/ข้อความ/วิดีโอ buttons (native dialer/contact page, EVEN IF a message icon is visible), OR directional call arrows, OR a phone/handset icon beside an entry, OR Thai call-status text, OR a ประวัติ (history) list of calls. Counts even with a single entry, no duration shown, or dark mode.\n- \"chat\": ONLY a genuine typed back-and-forth text conversation with actual message content. A call list is NEVER chat.\n- \"none\": neither is visible (e.g. location/scene photo, vehicle photo, blank/overlay-only image).\n\nDECISION ORDER: FIRST scan every image for a call record. If ANY image is a call record → \"call_log\" (do not even consider chat). ONLY if NONE is a call record → check for chat. If neither → \"none\".\n\nReturn ONLY: {\"detected_call_keywords\":[],\"evidence_type\":\"call_log|chat|none\",\"reason\":\"one sentence\"}`;\n\nconst ASSUME_CALL_PREFIX = `A separate classification step has ALREADY determined this image set's evidence_type is \"call_log\" — do not re-derive Step 0/1 below, just trust evidence_type=\"call_log\" and go straight to Step 2a to extract the call entries (and Step 3 below if present).\\n\\n`;\nconst ASSUME_CHAT_PREFIX = `A separate classification step has ALREADY determined this image set's evidence_type is \"chat\" — do not re-derive Step 0/1 below, just trust evidence_type=\"chat\" and go straight to Step 2b (and Step 3 below if present).\\n\\n`;\n\n// ── OCR Prompt ────────────────────────────────────────────────────────────────\nconst OCR_PROMPT = `You are a parcel logistics label auditor. Analyze the provided image(s) and respond ONLY with a valid JSON object.\n\nStep 1 - Label Detection: Identify if there is a visible shipping label (AWB/barcode label) on any parcel in the image.\n- step1_label_detected: \"Pass\" if label exists, \"Fail\" if no visible label\n\nStep 2 - ID Extraction: The tracking/AWB number is MACHINE-PRINTED (typeset) text located directly BELOW the longest/primary barcode on the label.\n- Only extract characters that are machine-printed. Do NOT extract handwritten numbers, handwritten marks, or any handwritten annotations on the label or parcel surface, even if they are near the barcode, resemble a tracking number, or are the only legible text visible.\n- If the text directly below the barcode is handwritten instead of printed, or no printed ID is legible, return \"UNREADABLE\" — never substitute a handwritten number for the printed ID.\n- step2_extracted_full_id: the extracted machine-printed ID string, or \"UNREADABLE\" if no legible printed ID exists\n\nReturn ONLY: {\"step1_label_detected\":\"Pass|Fail\",\"step2_extracted_full_id\":\"ID or UNREADABLE\",\"reason\":\"one sentence\"}`;\n\n// ── Call prompt (G1: call, call_no_ans) ───────────────────────────────────────\nconst CALL_SYSTEM = `You are a call-record auditor. Look at the provided image(s).\n\n${CALL_EVIDENCE_GUIDE}\n\nReturn ONLY: {\"detected_call_keywords\":[],\"evidence_type\":\"call_log|chat|none\",\"call_screenshot_index\":1,\"call_entries\":[{\"phone_last4\":\"xxxx\",\"duration_sec\":0,\"direction\":\"outgoing\",\"entry_date\":\"YYYY-MM-DD\",\"count\":1}],\"chat_relevant\":null,\"chat_summary\":\"\",\"reason\":\"one sentence\"}\nNote: detected_call_keywords must be filled in FIRST (Step 0) and mechanically determines evidence_type per the HARD RULE above. call_entries is meaningful only when evidence_type = \"call_log\". call_screenshot_index must be set whenever evidence_type is \"call_log\" OR \"chat\" (pointing at that image). chat_relevant is meaningful only when evidence_type = \"chat\".`;\n\n// ── Call + Location prompt (G2: call_loc) ─────────────────────────────────────\nconst CALL_LOC_SYSTEM = `You are a call-record and location auditor. From all provided images:\n\n${CALL_EVIDENCE_GUIDE}\n\nStep 3 - Find the location/scene photo: evaluate if the image is a physical camera photo showing a recognizable delivery location. IMPORTANT: A phone app screenshot showing delivery details, address text, parcel information, navigation UI, or any delivery app interface is NOT a valid location photo — return location_valid = \"Fail\" regardless of whether it contains an address. A valid location photo must be a physical camera photo showing an actual building exterior, house front, shop front, property entrance, street, or premises. Pass if a real physical location is visible in a camera photo. Fail if the image is a phone app screenshot, or if only a plain road or open area with no identifiable property is visible. When in doubt, choose Pass.\n\nReturn ONLY: {\"detected_call_keywords\":[],\"evidence_type\":\"call_log|chat|none\",\"call_screenshot_index\":1,\"call_entries\":[{\"phone_last4\":\"xxxx\",\"duration_sec\":0,\"direction\":\"outgoing\",\"entry_date\":\"YYYY-MM-DD\",\"count\":1}],\"chat_relevant\":null,\"chat_summary\":\"\",\"location_valid\":\"Pass|Fail\",\"reason\":\"one sentence\"}`;\n\n// ── Call + Location (Store variant, R101) ─────────────────────────────────────\nconst CALL_LOC_STORE_SYSTEM = `You are a call-record and location auditor. From all provided images:\n\n${CALL_EVIDENCE_GUIDE}\n\nStep 3 - Location/scene photo (MANDATORY — evaluate this SEPARATELY from the call/chat classification above, and check EVERY image in the set, even ones already used to answer Step 1/2a/2b — a chat or call screenshot occupying one image slot does NOT excuse you from checking the remaining image(s)):\n\nThe location/scene photo can appear at ANY position in the image set — there is no fixed order or index for it. Do not assume image_url_1 is always the location photo, or that it always comes last. Independently classify the content of EACH image you receive before deciding Pass/Fail.\n\nPASS if ANY one image in the set (not necessarily all) is a physical camera photo showing either:\n  (A) EXTERIOR — shop exterior, building entrance, property gate, storefront signage, or street-level view of the business, OR\n  (B) INDOOR — the driver physically inside the store/business premises: store interior, shop counter, shelving, parcel storage/staging area, pharmacy interior, office interior, or warehouse.\n(A) and (B) are EQUALLY VALID. An indoor photo does NOT need to also show the exterior or a shop sign to count — a photo of parcels stacked on a shelf inside the shop is sufficient proof of presence by itself.\n\nFAIL only if NONE of the images qualify under (A) or (B) — e.g. the set contains only a phone app screenshot (delivery app, navigation UI, address text, parcel info), only a chat/call screenshot, only a plain road/open area with no identifiable property, or images too blurry/blank to identify any location. A phone app screenshot is NEVER a valid location photo regardless of address text shown.\n\nWhen in doubt, choose Pass.\n\nIn \"reason\", state which image index/indices you checked for Step 3 and why the rejected one(s) did not qualify.\n\nReturn ONLY: {\"detected_call_keywords\":[],\"evidence_type\":\"call_log|chat|none\",\"call_screenshot_index\":1,\"call_entries\":[{\"phone_last4\":\"xxxx\",\"duration_sec\":0,\"direction\":\"outgoing\",\"entry_date\":\"YYYY-MM-DD\",\"count\":1}],\"chat_relevant\":null,\"chat_summary\":\"\",\"location_valid\":\"Pass|Fail\",\"reason\":\"one sentence\"}`;\n\n// ── Call + Vehicle prompt (G3: call_veh) ──────────────────────────────────────\nconst CALL_VEH_SYSTEM = `You are a call-record and vehicle auditor. From all provided images:\n\n${CALL_EVIDENCE_GUIDE}\n\nStep 3 - Find the vehicle photo: evaluate if the cargo area (motorcycle trunk, delivery box, or delivery bag) is visibly FULL with no space remaining to fit additional parcels. Pass if the cargo area is visibly full with no space remaining. Fail if there is still visible empty space for additional parcels. When in doubt, choose Pass.\n\nReturn ONLY: {\"detected_call_keywords\":[],\"evidence_type\":\"call_log|chat|none\",\"call_screenshot_index\":1,\"call_entries\":[{\"phone_last4\":\"xxxx\",\"duration_sec\":0,\"direction\":\"outgoing\",\"entry_date\":\"YYYY-MM-DD\",\"count\":1}],\"chat_relevant\":null,\"chat_summary\":\"\",\"vehicle_valid\":\"Pass|Fail\",\"reason\":\"one sentence\"}`;\n\n// ── External obstruction only (G5: ext) ───────────────────────────────────────\nconst EXT_SYSTEM = `You are a delivery obstruction auditor. Evaluate if the image shows a physical obstruction that prevents delivery.\n\nIMPORTANT — Route visibility requirement: The image MUST show a recognizable outdoor delivery route (road, street, property entrance, or access path) in the frame. If no delivery route is visible — for example the image shows only building materials, loose objects, an indoor scene, or isolated items with no road or path — return external_valid = \"Fail\". There is no delivery route to evaluate.\n\nPass if ALL of the following are true:\n- A recognizable outdoor delivery route is visible in the image, AND\n- ANY of the following obstructions is clearly present:\n  - The road/route is CLOSED or blocked so the driver cannot get through to pick up or deliver — a \"road closed\"/\"ปิดถนน\" sign, a barrier or gate across the road, a police/checkpoint closure, or a sealed-off entrance to the pickup/delivery location\n  - Flooding where water level reaches at least halfway up a motorcycle or car wheel, covers the footpath, or the road surface is not visible at all\n  - Construction barriers physically blocking the entire path with no way through\n\nFail if:\n- No recognizable delivery route (road, street, entrance, path) is visible in the image\n- Only traffic congestion is visible with no physical blockage\n- Construction activity is present alongside the road but the path is still open\n- Minor surface water on the road with the road still clearly visible\n- Building materials or construction objects are shown without a visible blocked route\n\nWhen in doubt, choose Fail (obstruction claims require clear evidence of both a route and a blockage).\n\nReturn ONLY: {\"external_valid\":\"Pass|Fail\",\"reason\":\"one sentence\"}`;\n\n// ── Call + External prompt (G4: call_ext) ─────────────────────────────────────\nconst CALL_EXT_SYSTEM = `You are a call-record and accident auditor. From all provided images:\n\n${CALL_EVIDENCE_GUIDE}\n\nStep 3 - Accident check: decide if the photo shows a REAL accident that prevented the driver from doing the pickup/delivery.\n\nPass ONLY if an actual accident is clearly and unambiguously visible:\n- A vehicle collision / crash scene — cars or motorcycles that have crashed or collided, with visible impact damage\n- The delivery vehicle overturned, crashed, or seriously damaged so it cannot be driven\n- A road accident scene with wreckage, emergency/rescue responders, or vehicles stopped around a crash\n- A clear injury or emergency situation resulting from an accident\n\nFail (this is the DEFAULT) in every other case, including:\n- A normal road, traffic jam, rain, wet pavement, or parking lot with NO accident\n- An undamaged vehicle, or only a minor scratch/dent while the vehicle is still usable\n- Flooding, weather, or a blocked road with no accident (that belongs to a different reason code, not this one)\n- Any scene where no clear accident is visible\n\nWhen in doubt, choose Fail. Your external_valid verdict MUST match these criteria — never Pass a scene where no actual accident is visible or that your own reason describes as \"no accident\" / \"minor\".\n\nReturn ONLY: {\"detected_call_keywords\":[],\"evidence_type\":\"call_log|chat|none\",\"call_screenshot_index\":1,\"call_entries\":[{\"phone_last4\":\"xxxx\",\"duration_sec\":0,\"direction\":\"outgoing\",\"entry_date\":\"YYYY-MM-DD\",\"count\":1}],\"chat_relevant\":null,\"chat_summary\":\"\",\"external_valid\":\"Pass|Fail\",\"reason\":\"one sentence\"}`;\n\n// ── Fuel gauge prompt (G8: fuel) ──────────────────────────────────────────────\nconst FUEL_SYSTEM = `You are a fuel gauge auditor. Look at the fuel gauge photo:\n1. Read the timestamp visible at the bottom of the image. The date may appear in Thai format (e.g. \"16-มิถุนายน-2026\") — convert Thai month names to numbers (มกราคม=01, กุมภาพันธ์=02, มีนาคม=03, เมษายน=04, พฤษภาคม=05, มิถุนายน=06, กรกฎาคม=07, สิงหาคม=08, กันยายน=09, ตุลาคม=10, พฤศจิกายน=11, ธันวาคม=12) and always return as YYYY-MM-DD.\n2. Evaluate if the fuel gauge shows truly empty fuel:\n   - Analog gauge: needle pointing at E marker with no margin above it\n   - Digital display: zero bars or no fuel level shown at all\n   Pass ONLY if fuel is truly empty by these criteria. Fail if any fuel level remains above E or any bars are still visible. When in doubt, choose Pass.\nReturn ONLY: {\"extracted_timestamp_date\":\"YYYY-MM-DD or N/A\",\"fuel_valid\":\"Pass if truly empty (E marker or zero bars) else Fail\",\"reason\":\"one sentence\"}`;\n\n// ── Prompt map ─────────────────────────────────────────────────────────────────\nconst PROMPTS = {\n  ocr: OCR_PROMPT,\n  call: CALL_SYSTEM,\n  call_loc: CALL_LOC_SYSTEM,\n  call_veh: CALL_VEH_SYSTEM,\n  ext: EXT_SYSTEM,\n  call_ext: CALL_EXT_SYSTEM,\n  call_no_ans: CALL_SYSTEM,\n  fuel: FUEL_SYSTEM\n};\n\nconst STORE_REASON_CODES = new Set([\"101\"]);\nconst MODEL = \"Qwen2.5-VL-72B-Instruct\";\nconst CALL_TYPES_HYBRID = new Set([\"call\", \"call_no_ans\", \"call_loc\", \"call_veh\", \"call_ext\"]);\n\nconst batch_type = $json.batch_type;\nconst rows = $json.rows;\n\nfunction buildLine(customId, systemPrompt, userContent) {\n  return JSON.stringify({\n    custom_id: customId,\n    method: \"POST\",\n    url: \"/v1/chat/completions\",\n    body: {\n      model: MODEL,\n      temperature: 0,\n      response_format: { type: \"json_object\" },\n      messages: [\n        { role: \"system\", content: systemPrompt },\n        { role: \"user\", content: userContent }\n      ]\n    }\n  });\n}\n\n// ── Build BBB JSONL (all rows, BBB-only prompt) ────────────────────────────────\nconst lines_bbb = [];\nfor (const row of rows) {\n  const imgs = [row.image_b64_1, row.image_b64_2, row.image_b64_3].filter(u => String(u || \"\").trim());\n  const userContent = [{ type: \"text\", text: \"Evaluate image quality for this set.\" }];\n  for (const url of imgs) {\n    userContent.push({ type: \"image_url\", image_url: { url, detail: \"high\" } });\n  }\n  lines_bbb.push(buildLine(`bbb|${row.row_number}`, BBB_PROMPT, userContent));\n}\n\n// ── Build Audit JSONL (rows by batch_type, with evidence_type + chat) ──────────\n// For call-type groups: 3 lines per row (classify / assume-call_log / assume-chat), routed in Process Results.\n// For other groups (ocr/ext/fuel): unchanged, 1 line per row.\nconst lines_audit = [];\nfor (const row of rows) {\n  const imgs = [row.image_b64_1, row.image_b64_2, row.image_b64_3].filter(u => String(u || \"\").trim());\n\n  let systemPrompt = PROMPTS[batch_type] || OCR_PROMPT;\n  if (batch_type === \"call_loc\" && STORE_REASON_CODES.has(String(row.onhold_reason_code || \"\"))) {\n    systemPrompt = CALL_LOC_STORE_SYSTEM;\n  }\n\n  const isCallType = CALL_TYPES_HYBRID.has(batch_type);\n  const onHoldReason = String(row.on_hold_reason_name_th || \"\");\n\n  let userText;\n  if (batch_type === \"ocr\") {\n    userText = \"Audit the shipping label on the parcel in this image.\";\n  } else if (isCallType) {\n    const onHoldDate = String(row.on_hold_date || \"\").trim().slice(0, 10);\n    userText = `Examine the provided image(s).${onHoldDate ? ` on_hold_date: \"${onHoldDate}\"` : \"\"}${onHoldReason ? ` on_hold_reason (for Step 2b chat-relevance check ONLY — never use this to decide evidence_type): \"${onHoldReason}\"` : \"\"}`;\n  } else if (batch_type === \"ext\") {\n    userText = \"Examine this image for delivery obstruction.\";\n  } else if (batch_type === \"fuel\") {\n    userText = \"Examine this fuel gauge photo.\";\n  } else {\n    userText = \"Examine the provided image(s).\";\n  }\n\n  const userContent = [{ type: \"text\", text: userText }];\n  for (const url of imgs) {\n    userContent.push({ type: \"image_url\", image_url: { url, detail: \"high\" } });\n  }\n\n  if (isCallType) {\n    lines_audit.push(buildLine(`${batch_type}::classify|${row.row_number}`, CLASSIFY_PROMPT, userContent));\n    lines_audit.push(buildLine(`${batch_type}::ascall|${row.row_number}`, ASSUME_CALL_PREFIX + systemPrompt, userContent));\n    lines_audit.push(buildLine(`${batch_type}::aschat|${row.row_number}`, ASSUME_CHAT_PREFIX + systemPrompt, userContent));\n  } else {\n    lines_audit.push(buildLine(`${batch_type}|${row.row_number}`, systemPrompt, userContent));\n  }\n}\n\n// ── Encode both JSONL files ───────────────────────────────────────────────────\nconst encoder = new TextEncoder();\n\nconst bbbStr = lines_bbb.join(\"\\n\");\nconst bbbBytes = encoder.encode(bbbStr);\n\nconst auditStr = lines_audit.join(\"\\n\");\nconst auditBytes = encoder.encode(auditStr);\n\nreturn [\n  {\n    json: { batch_type: \"bbb\", request_count: lines_bbb.length, source_batch_type: batch_type },\n    binary: {\n      data: {\n        data: Buffer.from(bbbBytes).toString(\"base64\"),\n        mimeType: \"application/jsonl\",\n        fileExtension: \"jsonl\",\n        fileName: `batch_bbb_${batch_type}.jsonl`\n      }\n    }\n  },\n  {\n    json: { batch_type, request_count: lines_audit.length, source_batch_type: batch_type },\n    binary: {\n      data: {\n        data: Buffer.from(auditBytes).toString(\"base64\"),\n        mimeType: \"application/jsonl\",\n        fileExtension: \"jsonl\",\n        fileName: `batch_${batch_type}.jsonl`\n      }\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        48
+      ],
+      "id": "5675f1f8-4821-4456-9259-4363392a0049",
+      "name": "Build JSONL"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://compass.llm.shopee.io/compass-api/v1/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "purpose",
+              "value": "batch"
+            },
+            {
+              "name": "project",
+              "value": "c62e6d0bed5c40858d5784bd2c1e0ee5"
+            },
+            {
+              "name": "file_name",
+              "value": "=batch.jsonl"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        896,
+        48
+      ],
+      "id": "b98e33ae-ee3c-479e-b20c-b2349577f0b8",
+      "name": "Upload File",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "openAiApi": {
+          "id": "LB5gkp153N9aK0t0",
+          "name": "OpenAi GPT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://compass.llm.shopee.io/compass-api/v1/batches",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  input_file_id: $json.id,\n  endpoint: '/v1/chat/completions',\n  completion_window: '24h',\n  project_id: 'c62e6d0bed5c40858d5784bd2c1e0ee5',\n  metadata: {\n    batch_name: 'RR_POOH ' + $('Build JSONL').item.json.batch_type + ' ' + $now.toFormat('yyyy-MM-dd HH:mm'),\n    batch_type: $('Build JSONL').item.json.batch_type,\n    source: 'RR_POOH'\n  }\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1120,
+        48
+      ],
+      "id": "853977a3-0c6a-4b23-9499-3af790d50d52",
+      "name": "Create Batch",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "openAiApi": {
+          "id": "LB5gkp153N9aK0t0",
+          "name": "OpenAi GPT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\nfor (const item of $input.all()) {\n  const c = item.json;\n  const batchType = (c.metadata && c.metadata.batch_type) ? c.metadata.batch_type : \"unknown\";\n  out.push({ json: {\n    batch_id: String(c.id || ''),\n    batch_type: batchType,\n    status: c.status || 'submitted',\n    input_file_id: c.input_file_id || '',\n    output_file_id: '',\n    submitted_at: new Date().toISOString(),\n    completed_at: ''\n  }});\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        48
+      ],
+      "id": "0bee3550-6823-4bde-90bd-d6ac220dceeb",
+      "name": "Return Batch Info"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { batch_type: $json.batch_type, rows: $json.rows } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        224
+      ],
+      "id": "8020f700-3b17-41e7-b10e-20d553961d66",
+      "name": "Prepare Chunk"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $json.rows || [];\nconst out = [];\nfor (const row of rows) {\n  for (const slot of [1, 2, 3]) {\n    const url = row['image_url_' + slot];\n    if (url && String(url).trim()) {\n      out.push({ json: { row_number: row.row_number, slot, url: String(url).trim(), retryCount: 0 } });\n    }\n  }\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        224
+      ],
+      "id": "68df873d-4f1e-48c8-be84-be5d6a4a119e",
+      "name": "Expand Images"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        0,
+        224
+      ],
+      "id": "6639950f-35e7-4c9a-9133-728bcdb36040",
+      "name": "Fetch Image",
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 2000,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const originalRows = $('Prepare Chunk').first().json.rows || [];\nconst batchType = $('Prepare Chunk').first().json.batch_type;\n\nconst items = $input.all();\nconst imgMap = {};\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i];\n  const rn = item.json.row_number;\n  const slot = item.json.slot;\n  if (!item.binary || !item.binary.data) continue;\n  if ((item.binary.data.bytes || 0) < 5000) continue;\n  const mime = item.binary.data.mimeType || 'image/jpeg';\n  const buffer = await this.helpers.getBinaryDataBuffer(i, 'data');\n  const b64 = buffer.toString('base64');\n  if (!imgMap[rn]) imgMap[rn] = {};\n  imgMap[rn][slot] = 'data:' + mime + ';base64,' + b64;\n}\n\nconst enrichedRows = originalRows.map(row => {\n  const imgs = imgMap[row.row_number] || {};\n  return Object.assign({}, row, {\n    image_b64_1: imgs[1] || '',\n    image_b64_2: imgs[2] || '',\n    image_b64_3: imgs[3] || ''\n  });\n});\n\nreturn [{ json: { batch_type: batchType, rows: enrichedRows } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        48
+      ],
+      "id": "a1d5938f-3b15-4225-8530-d85ce7b700df",
+      "name": "Aggregate Images"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $binary.data ? $binary.data.bytes : 0 }}",
+              "rightValue": 5000,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.retryCount }}",
+              "rightValue": 4,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        144
+      ],
+      "id": "94df5e35-bfdf-43e6-a102-1df32f9344c6",
+      "name": "Valid Image?"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ...$json, retryCount: ($json.retryCount || 0) + 1 } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        240
+      ],
+      "id": "1344fbad-767a-4a85-97ae-03f671665e65",
+      "name": "Increment Retry"
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        320
+      ],
+      "id": "efb2f70b-a28b-420e-b307-88b24ee41444",
+      "name": "Wait Before Retry",
+      "webhookId": "16e737d7-9ea7-4cf8-a243-085ef10c64c9"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Prepare Chunk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build JSONL": {
+      "main": [
+        [
+          {
+            "node": "Upload File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload File": {
+      "main": [
+        [
+          {
+            "node": "Create Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Batch": {
+      "main": [
+        [
+          {
+            "node": "Return Batch Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Chunk": {
+      "main": [
+        [
+          {
+            "node": "Expand Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand Images": {
+      "main": [
+        [
+          {
+            "node": "Fetch Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Image": {
+      "main": [
+        [
+          {
+            "node": "Valid Image?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Images": {
+      "main": [
+        [
+          {
+            "node": "Build JSONL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Image?": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Images",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Increment Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Increment Retry": {
+      "main": [
+        [
+          {
+            "node": "Wait Before Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Before Retry": {
+      "main": [
+        [
+          {
+            "node": "Fetch Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true,
+    "timeSavedMode": "fixed",
+    "saveExecutionProgress": false,
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all"
+  },
+  "versionId": "423f1fee-f9bb-4591-8ed8-684a26d606c6",
+  "meta": {
+    "instanceId": "3bfda752d0f10c69b897a741380d5efa9dafee1419424a3fe0740f77110c613a"
+  },
+  "id": "LPEGQa9PNKwqjuN5",
+  "tags": []
+}

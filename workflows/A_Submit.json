@@ -1,0 +1,335 @@
+{
+  "name": "[Batch] RR POOH - A Submit",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1216,
+        176
+      ],
+      "id": "b6c9856a-6397-4cf9-a7dd-d9a0fd8234e7",
+      "name": "Run Submit"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "documentId": {
+          "__rl": true,
+          "value": "1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg",
+          "mode": "list",
+          "cachedResultName": "[SPX TH] - RR POOH Audit Work Sheet - E",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg/edit?usp=drivesdk"
+        },
+        "title": "ai_batch_tracking",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1008,
+        304
+      ],
+      "id": "1ac01779-092d-46d1-bc0f-46ae716e69f9",
+      "name": "Ensure Tracking Tab",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "neaMidkIwRRUvLlJ",
+          "name": "Google Sheets Credential"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg",
+          "mode": "list",
+          "cachedResultName": "[SPX TH] - RR POOH Audit Work Sheet - E",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "[WIP] RR POOH - E",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -800,
+        304
+      ],
+      "id": "27a3a4e8-f83c-4bcf-a6a9-0b13fd4cec8e",
+      "name": "Read Sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "neaMidkIwRRUvLlJ",
+          "name": "Google Sheets Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const G_MAP={\n  \"107\":\"G1\",\"108\":\"G1\",\n  \"105\":\"G2\",\"132\":\"G2\",\"133\":\"G2\",\"109\":\"G2\",\"110\":\"G2\",\n  \"101\":\"G3\",\"103\":\"G3\",\"104\":\"G3\",\n  \"131\":\"G4\",\"106\":\"G5\",\"134\":\"G6\",\"102\":\"G7\",\"135\":\"G8\"\n};\nconst CALL_G=new Set([\"G2\",\"G3\",\"G4\",\"G6\",\"G7\"]);\nconst out=[];\nfor(const it of $input.all()){\n  const r=it.json;\n  const code=String(r.on_hold_reason_code||\"\").trim();\n  if(!code||!String(r.image_url_1||\"\").trim()) continue;\n  const g=G_MAP[code];\n  if(!g) continue;\n  const row={\n    row_number:r.row_number,\n    tracking_no:r.tracking_no,\n    onhold_reason_code:code,\n    on_hold_reason_name_th:String(r.on_hold_reason_name_th||\"\"),\n    audit_group:g,\n    image_url_1:r.image_url_1||\"\",\n    image_url_2:r.image_url_2||\"\",\n    image_url_3:r.image_url_3||\"\"\n  };\n  if(CALL_G.has(g)){\n    row.on_hold_date=String(r.on_hold_date||\"\");\n    row.contact_phone_masked=String(r.contact_phone_masked||\"\");\n    row.call_duration_in_sec=String(r.call_duration_in_sec||\"0\");\n  }\n  if(g===\"G8\") row.on_hold_date=String(r.on_hold_date||\"\");\n  out.push({json:row});\n}\nreturn out;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -608,
+        304
+      ],
+      "id": "08cafe61-0afb-483a-a6d0-413639efd7db",
+      "name": "Filter + Classify"
+    },
+    {
+      "parameters": {
+        "jsCode": "const CHUNK_DEFAULT=1000;\nconst CHUNK_HYBRID_CALL=150; // hybrid classify+ascall+aschat (2026-07-07) triples embedded image bytes per row for these types -> smaller chunks to stay under Compass's 200MB/file limit and n8n worker capacity\nconst HYBRID_CALL_TYPES=new Set([\"call\",\"call_no_ans\",\"call_loc\",\"call_veh\",\"call_ext\"]);\nconst BT={G1:\"ocr\",G2:\"call\",G3:\"call_loc\",G4:\"call_veh\",G5:\"ext\",G6:\"call_ext\",G7:\"call_no_ans\",G8:\"fuel\"};\nconst byG={};\nfor(const it of $input.all()){\n  const g=it.json.audit_group;\n  if(!byG[g]) byG[g]=[];\n  byG[g].push(it.json);\n}\nconst out=[];\nfor(const [g,rows] of Object.entries(byG)){\n  const bt=BT[g]||g;\n  const chunkSize = HYBRID_CALL_TYPES.has(bt) ? CHUNK_HYBRID_CALL : CHUNK_DEFAULT;\n  for(let i=0;i<rows.length;i+=chunkSize)\n    out.push({json:{batch_type:bt, chunk_index:Math.floor(i/chunkSize), rows:rows.slice(i,i+chunkSize)}});\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        304
+      ],
+      "id": "91f21459-fb9a-43da-8351-d9c40ceae965",
+      "name": "Make Chunks"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "LPEGQa9PNKwqjuN5",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/LPEGQa9PNKwqjuN5",
+          "cachedResultName": "[Batch] RR POOH - A Chunk (sub)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -176,
+        304
+      ],
+      "id": "05f57968-876e-4532-b2bd-20060bc5ae57",
+      "name": "Process Chunk (sub)"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg",
+          "mode": "list",
+          "cachedResultName": "[SPX TH] - RR POOH Audit Work Sheet - E",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 550281571,
+          "mode": "list",
+          "cachedResultName": "ai_batch_tracking",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg/edit#gid=550281571"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "batch_id",
+              "displayName": "batch_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "batch_type",
+              "displayName": "batch_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "request_count",
+              "displayName": "request_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "input_file_id",
+              "displayName": "input_file_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "output_file_id",
+              "displayName": "output_file_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "submitted_at",
+              "displayName": "submitted_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "completed_at",
+              "displayName": "completed_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        48,
+        304
+      ],
+      "id": "472a2a2a-cb42-41fd-9083-6a0cd7c2c43d",
+      "name": "Append Tracking",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "neaMidkIwRRUvLlJ",
+          "name": "Google Sheets Credential"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Run Submit": {
+      "main": [
+        [
+          {
+            "node": "Ensure Tracking Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ensure Tracking Tab": {
+      "main": [
+        [
+          {
+            "node": "Read Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Sheet": {
+      "main": [
+        [
+          {
+            "node": "Filter + Classify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter + Classify": {
+      "main": [
+        [
+          {
+            "node": "Make Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make Chunks": {
+      "main": [
+        [
+          {
+            "node": "Process Chunk (sub)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Chunk (sub)": {
+      "main": [
+        [
+          {
+            "node": "Append Tracking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveExecutionProgress": false,
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "timeSavedMode": "fixed"
+  },
+  "versionId": "0c7b8328-7cc7-4c52-8c25-feb241445594",
+  "meta": {
+    "instanceId": "3bfda752d0f10c69b897a741380d5efa9dafee1419424a3fe0740f77110c613a"
+  },
+  "id": "8P9k8jZzJfut6fKb",
+  "tags": []
+}

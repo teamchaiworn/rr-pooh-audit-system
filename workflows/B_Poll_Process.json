@@ -1,0 +1,2560 @@
+{
+  "name": "[Batch] RR POOH - B Poll & Process",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1408,
+        464
+      ],
+      "id": "0dd59406-2065-4b46-acbb-09318bfee792",
+      "name": "Run Poll"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg",
+          "mode": "list",
+          "cachedResultName": "[SPX TH] - RR POOH Audit Work Sheet - E",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "[WIP] RR POOH - E",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1184,
+        304
+      ],
+      "id": "e58ccad5-3cfa-49e0-8118-2f0a8bd88687",
+      "name": "Read Source",
+      "retryOnFail": false,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "neaMidkIwRRUvLlJ",
+          "name": "Google Sheets Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg",
+          "mode": "list",
+          "cachedResultName": "[SPX TH] - RR POOH Audit Work Sheet - E",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 550281571,
+          "mode": "list",
+          "cachedResultName": "ai_batch_tracking",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg/edit#gid=550281571"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -960,
+        304
+      ],
+      "id": "60c40b2f-8c8e-4666-90c8-3661399fbb6f",
+      "name": "Read Tracking",
+      "retryOnFail": false,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "neaMidkIwRRUvLlJ",
+          "name": "Google Sheets Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const out=[];\ntry{ const inj=$('Webhook Poll').first().json.body.test_batches||[]; for(const t of inj){ if(t&&t.batch_id) out.push({json:{batch_id:String(t.batch_id),batch_type:String(t.batch_type||\"ocr\"),status:\"injected\"}}); } }catch(e){}\nfor(const it of $input.all()){\n  const r=it.json;\n  const bid=String(r.batch_id||\"\").trim();\n  if(!bid) continue;\n  if(String(r.status||\"\")===\"done\") continue;\n  out.push({json:{batch_id:bid, batch_type:String(r.batch_type||\"\"), status:String(r.status||\"\")}});\n}\nout.sort((a,b)=> { const order=(t)=> t===\"bbb\"?0:t===\"ocr\"?1:2; return order(a.json.batch_type)-order(b.json.batch_type); });\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -736,
+        304
+      ],
+      "id": "24b7261b-b87f-45a3-ac4d-cbfea2460e39",
+      "name": "Select Pending"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -528,
+        304
+      ],
+      "id": "a3ca374a-10cd-4fb2-9a01-1abbe617a90e",
+      "name": "Loop Batches"
+    },
+    {
+      "parameters": {
+        "url": "=https://compass.llm.shopee.io/compass-api/v1/batches/{{ $json.batch_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -304,
+        304
+      ],
+      "id": "5c3245ef-fdcd-4137-a80f-94c59ec135c9",
+      "name": "Get Batch",
+      "credentials": {
+        "openAiApi": {
+          "id": "LB5gkp153N9aK0t0",
+          "name": "OpenAi GPT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.output_file_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -80,
+        304
+      ],
+      "id": "c5f904c5-4de1-480d-8b45-1607fd7dd456",
+      "name": "Is Completed"
+    },
+    {
+      "parameters": {
+        "url": "=https://compass.llm.shopee.io/compass-api/v1/files/{{ $json.output_file_id }}/content",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "jsonl"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        160,
+        208
+      ],
+      "id": "c2cca028-8032-41f1-981e-1ea215495fba",
+      "name": "Get Output",
+      "credentials": {
+        "openAiApi": {
+          "id": "LB5gkp153N9aK0t0",
+          "name": "OpenAi GPT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const parseSafe = (input) => {\n  if (!input) return {};\n  if (typeof input === \"object\") return input;\n  try { return JSON.parse(String(input).replace(/```json|```/g, \"\").trim()); }\n  catch (e) { return {}; }\n};\n\n// ── BBB Only batch (new) ───────────────────────────────────────────────────────\nfunction computeBBB(res, row_number) {\n  // Fail-only gate: Fail ONLY when the model explicitly says \"fail\".\n  // Missing key / garbage / degeneration = no affirmative Fail condition matched → Pass.\n  const bbbRaw = String(res.blank_blur_back || \"\").toLowerCase();\n  const bbbVal = bbbRaw.includes(\"fail\") ? \"Fail\" : \"Pass\";\n  return {\n    row_number,\n    blank_blur_back: bbbVal,\n    wb_type: \"bbb\"\n  };\n}\n\n// ── OCR: 3-tier matching (G1) ──────────────────────────────────────────────────\nfunction computeOCR(res, tracking_no, row_number) {\n  if (!row_number) throw new Error(\"computeOCR: row_number missing\");\n  const auth_check = res.step1_label_detected || \"No\";\n  const extracted_raw = String(res.step2_extracted_full_id || \"\");\n\n  const cleanID = (id) => String(id).replace(/[^A-Z0-9]/gi, \"\").toUpperCase();\n  const target_clean = cleanID(tracking_no);\n  const extracted_clean = cleanID(extracted_raw);\n\n  const normalizeAmbiguous = (id) => String(id)\n    .replace(/[5S]/g, \"S\").replace(/[2Z]/g, \"Z\").replace(/[0O]/g, \"O\")\n    .replace(/[1IL]/g, \"I\").replace(/[8B]/g, \"B\");\n\n  const ambiguousPairs = {\n    \"S\": [\"5\"], \"5\": [\"S\"], \"Z\": [\"2\"], \"2\": [\"Z\"],\n    \"O\": [\"0\"], \"0\": [\"O\"],\n    \"I\": [\"1\", \"L\"], \"1\": [\"I\", \"L\"], \"L\": [\"I\", \"1\"],\n    \"B\": [\"8\"], \"8\": [\"B\", \"6\"], \"6\": [\"8\", \"G\"], \"G\": [\"6\"],\n  };\n\n  const getEditDistance = (a, b) => {\n    if (a.length === 0) return b.length;\n    if (b.length === 0) return a.length;\n    const matrix = [];\n    for (let i = 0; i <= b.length; i++) matrix[i] = [i];\n    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;\n    for (let i = 1; i <= b.length; i++) {\n      for (let j = 1; j <= a.length; j++) {\n        const cA = a.charAt(j - 1);\n        const cB = b.charAt(i - 1);\n        let subCost = 1;\n        if (cA === cB) subCost = 0;\n        else if (ambiguousPairs[cA] && ambiguousPairs[cA].includes(cB)) subCost = 0;\n        matrix[i][j] = Math.min(matrix[i - 1][j - 1] + subCost, Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1));\n      }\n    }\n    return matrix[b.length][a.length];\n  };\n\n  let awb_match = \"Fail\";\n  if (extracted_clean && extracted_clean !== \"UNREADABLE\" && extracted_clean.length >= 4) {\n    if (target_clean.endsWith(extracted_clean.slice(-4)) || extracted_clean.endsWith(target_clean.slice(-4))) {\n      awb_match = \"Pass\";\n    } else {\n      const normT = normalizeAmbiguous(target_clean);\n      const normE = normalizeAmbiguous(extracted_clean);\n      if (normT.endsWith(normE.slice(-4)) || normE.endsWith(normT.slice(-4))) {\n        awb_match = \"Pass\";\n      } else {\n        const typos = getEditDistance(target_clean, extracted_clean);\n        if (target_clean.length >= 8 && typos <= 2) awb_match = \"Pass\";\n      }\n    }\n  }\n\n  const isAuthPass = auth_check.toLowerCase().includes(\"pass\") || auth_check.toLowerCase().includes(\"yes\");\n\n  // Quality gate removed — N/A for bbb=Fail rows is applied by the Reconcile stage (bbb column).\n  const awbVal = (isAuthPass && awb_match === \"Pass\") ? \"Pass\" : \"Fail\";\n  const parcelVal = awbVal;\n\n  return {\n    row_number,\n    awb: awbVal,\n    parcel: parcelVal,\n    call_log: \"N/A\",   // not applicable to OCR group\n    location: \"N/A\",\n    vehicle: \"N/A\",\n    external_factor: \"N/A\",\n    wb_type: \"ocr\"\n    // blank_blur_back written only by standalone BBB batch\n  };\n}\n\n// ── Call groups: date+duration+evidence_type+chat ──────────────────────────────\nfunction parseDuration(val) {\n  if (typeof val === \"number\") return val;\n  const s = String(val || \"0\").trim();\n  const parts = s.split(\":\").map(Number);\n  if (parts.length === 2) return (parts[0] * 60) + parts[1];\n  if (parts.length === 3) return (parts[0] * 3600) + (parts[1] * 60) + parts[2];\n  return parseFloat(s) || 0;\n}\n\nfunction extractUrlDate(url) {\n  const m = String(url).match(/\\/downloads\\/(\\d{4})\\/(\\d{2})\\/(\\d{2})\\//);\n  return m ? `${m[1]}-${m[2]}-${m[3]}` : \"\";\n}\n\n// ── shared precondition: the identified evidence screenshot's upload date must match on_hold_date ──\n// used by both call_log (evalCallLog) and chat (computeCall) paths — same rule, same field (call_screenshot_index).\nfunction screenshotDateMatches(res, row) {\n  const allUrls = [row.image_url_1, row.image_url_2, row.image_url_3];\n  const csIdx = Math.max(1, Math.min(3, parseInt(res.call_screenshot_index) || 1)) - 1;\n  const url = allUrls[csIdx] || row.image_url_1 || \"\";\n  const urlDate = extractUrlDate(url);\n  const sysDate = String(row.on_hold_date || \"\").trim().slice(0, 10);\n  return !!(urlDate && sysDate && urlDate === sysDate);\n}\n\n// ── call_log rules per reason code — OUTGOING calls only, phone + date must match ──\n// answered = duration >= 6s ; attempt = duration < 6s (missed 0s OR short 1-5s)\n// 103 = lenient (any connected outgoing call = Pass - รับสาย)\n// 102 = inverted (answered >=6s = Fail - รับสาย ; >=2 attempts = Pass - ไม่รับสาย)\n// standard (101,104,105,109,110,131,132,133,134): answered>=1 -> Pass-รับสาย; >=2 attempts -> Pass-ไม่รับสาย; else Fail\nfunction evalCallLog(res, row, type) {\n  const code = String(row.on_hold_reason_code || \"\").trim();\n\n  // date precondition: call screenshot date must match on_hold_date\n  if (!screenshotDateMatches(res, row)) return \"Fail\";\n\n  const phone4 = String(row.contact_phone_masked || \"\").replace(/\\D/g, \"\").slice(-4);\n  const rawEntries = Array.isArray(res.call_entries) ? res.call_entries : [];\n  // Defense-in-depth: prompt already asks the model to date-filter call_entries at extraction time,\n  // but that has proven unreliable (wrong-day entries slipping through). Re-filter here on entry_date\n  // vs on_hold_date. If entry_date is missing/empty (older cached data, or model non-compliance),\n  // keep the entry as-is to preserve current behavior exactly.\n  const onHoldDate = String(row.on_hold_date || \"\").trim().slice(0, 10);\n  const entries = rawEntries.filter(e => !e.entry_date || e.entry_date === onHoldDate);\n\n  let answered = 0, attempts = 0, connected = 0;\n  for (const e of entries) {\n    if (String(e.direction || \"\").toLowerCase() !== \"outgoing\") continue; // incoming/unknown ignored\n    const phoneKey = (\"phone_last4\" in e && e.phone_last4) ? \"phone_last4\" : Object.keys(e).find(k => /^phone_last/i.test(k) && e[k]);\n    const p = String(phoneKey ? e[phoneKey] : \"\").replace(/\\D/g, \"\").slice(-4);\n    if (!(phone4 && p && p === phone4)) continue;                          // phone must match\n    const cnt = Math.max(1, Math.round(Number(e.count) || 1));            // Android \"(N)\" repeat-count badge; default 1 if absent/0/non-numeric\n    const dur = parseDuration(e.duration_sec);\n    if (dur >= 6) { answered += cnt; connected += cnt; }\n    else if (dur >= 1) { attempts += cnt; connected += cnt; }  // short 1-5s = attempt (also connected for 103)\n    else { attempts += cnt; }                             // 0s / missed = attempt\n  }\n\n  if (code === \"103\") return connected >= 1 ? \"Pass - รับสาย\" : \"Fail\";\n\n  const inverted = code === \"102\" || (!code && type === \"call_no_ans\");\n  if (inverted) {\n    if (answered >= 1) return \"Fail - รับสาย\";\n    if (attempts >= 2) return \"Pass - ไม่รับสาย\";\n    return \"Fail\";\n  }\n\n  // standard rule\n  if (answered >= 1) return \"Pass - รับสาย\";\n  if (attempts >= 2) return \"Pass - ไม่รับสาย\";\n  return \"Fail\";\n}\n\nfunction computeCall(res, type, row) {\n  const rowNum = row.row_number;\n\n  // Quality gate removed — N/A for bbb=Fail rows is applied by the Reconcile stage (bbb column).\n\n  // ── evidence_type routing ──────────────────────────────────────────────────\n  const evidenceType = String(res.evidence_type || \"call_log\").toLowerCase();\n  let callLog;\n\n  if (evidenceType === \"chat\") {\n    // Same upload-date precondition as call_log — the chat screenshot's date must match on_hold_date.\n    if (!screenshotDateMatches(res, row)) {\n      callLog = \"Fail\";\n    } else if (res.chat_relevant === true) {\n      callLog = \"Pass - in app chat\";\n    } else if (res.chat_relevant === false) {\n      // null/undefined means relevance was never evaluated (often a misdetection) → plain Fail, handled below.\n      callLog = \"Fail - in app chat\";\n    } else {\n      callLog = \"Fail\";\n    }\n  } else if (evidenceType === \"none\") {\n    callLog = \"Fail\";\n  } else {\n    // call_log evidence — per reason-code rules, outgoing calls only\n    callLog = evalCallLog(res, row, type);\n  }\n\n  const out = {\n    row_number: rowNum,\n    awb: \"N/A\",\n    parcel: \"N/A\",\n    // blank_blur_back intentionally omitted — written by BBB batch\n    call_log: callLog,\n    location: \"N/A\",\n    vehicle: \"N/A\",\n    external_factor: \"N/A\",\n    wb_type: type\n  };\n\n  if (type === \"call_loc\") {\n    out.location = String(res.location_valid || \"\").toLowerCase().includes(\"pass\") ? \"Pass\" : \"Fail\";\n  }\n  if (type === \"call_veh\") {\n    out.vehicle = String(res.vehicle_valid || \"\").toLowerCase().includes(\"pass\") ? \"Pass\" : \"Fail\";\n  }\n  if (type === \"call_ext\") {\n    out.external_factor = String(res.external_valid || \"\").toLowerCase().includes(\"pass\") ? \"Pass\" : \"Fail\";\n  }\n\n  return out;\n}\n\n// ── Hybrid picker: combine classify + assume-call + assume-chat results ────────\n// classify decides evidence_type; the matching \"assume\" variant supplies call_entries /\n// chat_relevant / location_valid / vehicle_valid / external_valid (Step 3 is independent\n// of the call/chat decision, so either variant's Step 3 answer is usable as a fallback).\nfunction pickHybridResult(classify, ascall, aschat) {\n  const evType = String((classify && classify.evidence_type) || \"\").toLowerCase();\n  if (evType === \"call_log\" && ascall) {\n    return Object.assign({}, ascall, { evidence_type: \"call_log\" });\n  }\n  if (evType === \"chat\" && aschat) {\n    return Object.assign({}, aschat, { evidence_type: \"chat\" });\n  }\n  // \"none\", or classify missing/failed to parse, or the matching assume-variant is missing\n  // (e.g. dropped by an upstream error) -> force Fail via evidence_type \"none\", but keep\n  // whichever Step 3 field (location/vehicle/external) is available from either variant.\n  const fallback = ascall || aschat || {};\n  return Object.assign({}, fallback, { evidence_type: \"none\" });\n}\n\n// ── External obstruction (G5) ──────────────────────────────────────────────────\nfunction computeExt(res, row_number) {\n  if (!row_number) throw new Error(\"computeExt: row_number missing\");\n  // Quality gate removed — N/A for bbb=Fail rows is applied by the Reconcile stage (bbb column).\n  return {\n    row_number,\n    awb: \"N/A\", parcel: \"N/A\",\n    call_log: \"N/A\", location: \"N/A\", vehicle: \"N/A\",\n    external_factor: String(res.external_valid || \"\").toLowerCase().includes(\"pass\") ? \"Pass\" : \"Fail\",\n    wb_type: \"ext\"\n  };\n}\n\n// ── Fuel gauge (G8) ────────────────────────────────────────────────────────────\nfunction computeFuel(res, row) {\n  const rowNum = row.row_number;\n  const sysDate = String(row.on_hold_date || \"\").trim().slice(0, 10);\n  const tsDate = String(res.extracted_timestamp_date || \"\").trim().slice(0, 10);\n  const dateValid = !!(tsDate && sysDate && tsDate === sysDate);\n  const fuelOk = String(res.fuel_valid || \"\").toLowerCase().includes(\"pass\");\n  // Quality gate removed — N/A for bbb=Fail rows is applied by the Reconcile stage (bbb column).\n  return {\n    row_number: rowNum,\n    awb: \"N/A\", parcel: \"N/A\",\n    call_log: \"N/A\", location: \"N/A\", vehicle: \"N/A\",\n    external_factor: (dateValid && fuelOk) ? \"Pass\" : \"Fail\",\n    wb_type: \"fuel\"\n  };\n}\n\n// ── Main ───────────────────────────────────────────────────────────────────────\nconst raw = String($json.jsonl || \"\");\nconst src = $('Read Source').all().map(i => i.json);\nconst srcMap = {};\nfor (const r of src) srcMap[String(r.row_number)] = r;\n\nconst CALL_TYPES = new Set([\"call\", \"call_loc\", \"call_veh\", \"call_ext\", \"call_no_ans\"]);\n\n// hybrid call-type groups: key = `${baseType}|${rowStr}` -> { baseType, row, classify, ascall, aschat }\nconst callGroups = {};\n\nconst out = [];\nfor (const line of raw.split(\"\\n\")) {\n  if (!line.trim()) continue;\n  let obj; try { obj = JSON.parse(line); } catch (e) { continue; }\n  const cid = String(obj.custom_id || \"\");\n  const sep = cid.indexOf(\"|\");\n  if (sep === -1) continue;\n  const typeRaw = cid.slice(0, sep);\n  const rowStr = cid.slice(sep + 1);\n  if (!rowStr) continue;\n  if (obj.error || !obj.response || obj.response.status_code !== 200) continue;\n  let content = \"\";\n  try { content = obj.response.body.choices[0].message.content; } catch (e) {}\n  const res = parseSafe(content);\n  const row = srcMap[rowStr] || {};\n  const rowNum = Number(rowStr) || rowStr;\n  row.row_number = rowNum;\n\n  if (typeRaw.includes(\"::\")) {\n    // hybrid call-type line: \"<baseType>::classify|<row>\" / \"::ascall|<row>\" / \"::aschat|<row>\"\n    const [baseType, stage] = typeRaw.split(\"::\");\n    const key = `${baseType}|${rowStr}`;\n    if (!callGroups[key]) callGroups[key] = { baseType, row };\n    callGroups[key][stage] = res;\n    continue;\n  }\n\n  if (typeRaw === \"bbb\") {\n    out.push({ json: computeBBB(res, rowNum) });\n  } else if (typeRaw === \"ocr\") {\n    out.push({ json: computeOCR(res, String(row.tracking_no || \"\"), rowNum) });\n  } else if (typeRaw === \"ext\") {\n    out.push({ json: computeExt(res, rowNum) });\n  } else if (typeRaw === \"fuel\") {\n    out.push({ json: computeFuel(res, row) });\n  }\n  // (CALL_TYPES no longer arrive as plain lines — always routed through the \"::\" branch above)\n}\n\n// finalize hybrid call-type groups now that classify/ascall/aschat have been collected\nfor (const key in callGroups) {\n  const g = callGroups[key];\n  const finalRes = pickHybridResult(g.classify, g.ascall, g.aschat);\n  out.push({ json: computeCall(finalRes, g.baseType, g.row) });\n}\n\nreturn out;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        208
+      ],
+      "id": "95e2ff0b-1379-4c3d-b2a1-7aa0bcb80a4d",
+      "name": "Process Results"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg",
+          "mode": "list",
+          "cachedResultName": "[SPX TH] - RR POOH Audit Work Sheet - E",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "[WIP] RR POOH - E",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $json.row_number }}",
+            "awb": "={{ $json.awb }}",
+            "parcel": "={{ $json.parcel }}",
+            "call_log": "={{ $json.call_log }}",
+            "location": "={{ $json.location }}",
+            "vehicle": "={{ $json.vehicle }}",
+            "external_factor": "={{ $json.external_factor }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false,
+              "readOnly": true
+            },
+            {
+              "id": "seller_shop_id",
+              "displayName": "seller_shop_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "seller_name",
+              "displayName": "seller_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "tracking_no",
+              "displayName": "tracking_no",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "latest_status_name",
+              "displayName": "latest_status_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_reason_code",
+              "displayName": "on_hold_reason_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_reason_name",
+              "displayName": "on_hold_reason_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_reason_name_th",
+              "displayName": "on_hold_reason_name_th",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fault_attribution",
+              "displayName": "fault_attribution",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_date",
+              "displayName": "on_hold_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_timestamp",
+              "displayName": "on_hold_timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_driver_id",
+              "displayName": "on_hold_driver_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_driver_name",
+              "displayName": "on_hold_driver_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fleet_type",
+              "displayName": "fleet_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "driver_group",
+              "displayName": "driver_group",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "contract_type",
+              "displayName": "contract_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fleet_email",
+              "displayName": "fleet_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "agency_name",
+              "displayName": "agency_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "station_id",
+              "displayName": "station_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "station_name",
+              "displayName": "station_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "station_province_name",
+              "displayName": "station_province_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "station_district_name",
+              "displayName": "station_district_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "station_rm_zone",
+              "displayName": "station_rm_zone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "station_am_area",
+              "displayName": "station_am_area",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "rm_email",
+              "displayName": "rm_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "am_email",
+              "displayName": "am_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "hub_supervisor_email",
+              "displayName": "hub_supervisor_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "count_on_hold_pickup_attempt",
+              "displayName": "count_on_hold_pickup_attempt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "all_on_hold_pickup_timestamp",
+              "displayName": "all_on_hold_pickup_timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "link_fms_shipment",
+              "displayName": "link_fms_shipment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "pickup_task_id",
+              "displayName": "pickup_task_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "no_of_image",
+              "displayName": "no_of_image",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "image_url_1",
+              "displayName": "image_url_1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "image_url_2",
+              "displayName": "image_url_2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "image_url_3",
+              "displayName": "image_url_3",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cogs_amount",
+              "displayName": "cogs_amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "call_attempt",
+              "displayName": "call_attempt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "is_call_picked_up",
+              "displayName": "is_call_picked_up",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ring_duration_in_sec",
+              "displayName": "ring_duration_in_sec",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "call_duration_in_sec",
+              "displayName": "call_duration_in_sec",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "call_timestamp",
+              "displayName": "call_timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "call_status",
+              "displayName": "call_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "contact_phone_masked",
+              "displayName": "contact_phone_masked",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "result_call_log",
+              "displayName": "result_call_log",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "auditor",
+              "displayName": "auditor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "qc_name",
+              "displayName": "qc_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "image_1",
+              "displayName": "image_1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "guide",
+              "displayName": "guide",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "blank_blur_back",
+              "displayName": "blank_blur_back",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "location",
+              "displayName": "location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "call_log",
+              "displayName": "call_log",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "parcel",
+              "displayName": "parcel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "awb",
+              "displayName": "awb",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "vehicle",
+              "displayName": "vehicle",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "external_factor",
+              "displayName": "external_factor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "final_result",
+              "displayName": "final_result",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fail_reason",
+              "displayName": "fail_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        864,
+        352
+      ],
+      "alwaysOutputData": true,
+      "id": "e5d8cd18-2af1-4b49-942e-0319e371f04b",
+      "name": "Update Results Audit",
+      "retryOnFail": false,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "neaMidkIwRRUvLlJ",
+          "name": "Google Sheets Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg",
+          "mode": "list",
+          "cachedResultName": "[SPX TH] - RR POOH Audit Work Sheet - E",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 550281571,
+          "mode": "list",
+          "cachedResultName": "ai_batch_tracking",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg/edit#gid=550281571"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "batch_id": "={{ $('Loop Batches').item.json.batch_id }}",
+            "status": "done",
+            "completed_at": "={{ $now.toISO() }}",
+            "row_number": 0,
+            "output_file_id": "={{ $('Get Batch').item.json.output_file_id }}"
+          },
+          "matchingColumns": [
+            "batch_id"
+          ],
+          "schema": [
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "type": "number",
+              "readOnly": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "required": false,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "batch_id",
+              "displayName": "batch_id",
+              "type": "number",
+              "defaultMatch": true,
+              "canBeUsedToMatch": true,
+              "required": false,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "batch_type",
+              "displayName": "batch_type",
+              "type": "string",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "required": false,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "request_count",
+              "displayName": "request_count",
+              "type": "string",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "required": false,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "type": "string",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "required": false,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "input_file_id",
+              "displayName": "input_file_id",
+              "type": "string",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "required": false,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "output_file_id",
+              "displayName": "output_file_id",
+              "type": "string",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "required": false,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "submitted_at",
+              "displayName": "submitted_at",
+              "type": "string",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "required": false,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "completed_at",
+              "displayName": "completed_at",
+              "type": "string",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "required": false,
+              "display": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1120,
+        208
+      ],
+      "alwaysOutputData": true,
+      "id": "e42223cf-5a4a-4636-8414-73f81870cc3c",
+      "name": "Mark Done",
+      "retryOnFail": false,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "neaMidkIwRRUvLlJ",
+          "name": "Google Sheets Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "r1",
+              "leftValue": "={{ $json.wb_type }}",
+              "rightValue": "bbb",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        624,
+        208
+      ],
+      "id": "route-by-type-001",
+      "name": "Route by Type"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg",
+          "mode": "list",
+          "cachedResultName": "[SPX TH] - RR POOH Audit Work Sheet - E",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "[WIP] RR POOH - E",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $json.row_number }}",
+            "blank_blur_back": "={{ $json.blank_blur_back }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false,
+              "readOnly": true
+            },
+            {
+              "id": "seller_shop_id",
+              "displayName": "seller_shop_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "seller_name",
+              "displayName": "seller_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "tracking_no",
+              "displayName": "tracking_no",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "latest_status_name",
+              "displayName": "latest_status_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_reason_code",
+              "displayName": "on_hold_reason_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_reason_name",
+              "displayName": "on_hold_reason_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_reason_name_th",
+              "displayName": "on_hold_reason_name_th",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fault_attribution",
+              "displayName": "fault_attribution",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_date",
+              "displayName": "on_hold_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_timestamp",
+              "displayName": "on_hold_timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_driver_id",
+              "displayName": "on_hold_driver_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_driver_name",
+              "displayName": "on_hold_driver_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fleet_type",
+              "displayName": "fleet_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "driver_group",
+              "displayName": "driver_group",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "contract_type",
+              "displayName": "contract_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fleet_email",
+              "displayName": "fleet_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "agency_name",
+              "displayName": "agency_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "station_id",
+              "displayName": "station_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "station_name",
+              "displayName": "station_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "station_province_name",
+              "displayName": "station_province_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "station_district_name",
+              "displayName": "station_district_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "station_rm_zone",
+              "displayName": "station_rm_zone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "station_am_area",
+              "displayName": "station_am_area",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "rm_email",
+              "displayName": "rm_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "am_email",
+              "displayName": "am_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "hub_supervisor_email",
+              "displayName": "hub_supervisor_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "count_on_hold_pickup_attempt",
+              "displayName": "count_on_hold_pickup_attempt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "all_on_hold_pickup_timestamp",
+              "displayName": "all_on_hold_pickup_timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "link_fms_shipment",
+              "displayName": "link_fms_shipment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "pickup_task_id",
+              "displayName": "pickup_task_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "no_of_image",
+              "displayName": "no_of_image",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "image_url_1",
+              "displayName": "image_url_1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "image_url_2",
+              "displayName": "image_url_2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "image_url_3",
+              "displayName": "image_url_3",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cogs_amount",
+              "displayName": "cogs_amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "call_attempt",
+              "displayName": "call_attempt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "is_call_picked_up",
+              "displayName": "is_call_picked_up",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ring_duration_in_sec",
+              "displayName": "ring_duration_in_sec",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "call_duration_in_sec",
+              "displayName": "call_duration_in_sec",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "call_timestamp",
+              "displayName": "call_timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "call_status",
+              "displayName": "call_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "contact_phone_masked",
+              "displayName": "contact_phone_masked",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "result_call_log",
+              "displayName": "result_call_log",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "auditor",
+              "displayName": "auditor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "qc_name",
+              "displayName": "qc_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "image_1",
+              "displayName": "image_1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "guide",
+              "displayName": "guide",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "blank_blur_back",
+              "displayName": "blank_blur_back",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "location",
+              "displayName": "location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "call_log",
+              "displayName": "call_log",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "parcel",
+              "displayName": "parcel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "awb",
+              "displayName": "awb",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "vehicle",
+              "displayName": "vehicle",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "external_factor",
+              "displayName": "external_factor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "final_result",
+              "displayName": "final_result",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fail_reason",
+              "displayName": "fail_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        864,
+        80
+      ],
+      "id": "update-results-bbb-001",
+      "name": "Update Results BBB",
+      "retryOnFail": false,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "neaMidkIwRRUvLlJ",
+          "name": "Google Sheets Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg",
+          "mode": "list",
+          "cachedResultName": "[SPX TH] - RR POOH Audit Work Sheet - E",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "[WIP] RR POOH - E",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        128,
+        16
+      ],
+      "id": "reconcile-read-001",
+      "name": "Reconcile Read",
+      "retryOnFail": false,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "neaMidkIwRRUvLlJ",
+          "name": "Google Sheets Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\nfor (const it of $input.all()) {\n  const r = it.json;\n  const bbb = String(r.blank_blur_back || \"\").toLowerCase();\n  if (!bbb.includes(\"fail\")) continue;\n  out.push({ json: {\n    row_number: r.row_number,\n    awb: \"N/A\", parcel: \"N/A\", call_log: \"N/A\",\n    location: \"N/A\", vehicle: \"N/A\", external_factor: \"N/A\"\n  }});\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        16
+      ],
+      "id": "reconcile-build-001",
+      "name": "Reconcile Build NA"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg",
+          "mode": "list",
+          "cachedResultName": "[SPX TH] - RR POOH Audit Work Sheet - E",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "[WIP] RR POOH - E",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lgVRLvoXvD-6FA_dKizxoW6LcKfFoz_yPZ6N7PyJ4Cg/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $json.row_number }}",
+            "awb": "={{ $json.awb }}",
+            "parcel": "={{ $json.parcel }}",
+            "call_log": "={{ $json.call_log }}",
+            "location": "={{ $json.location }}",
+            "vehicle": "={{ $json.vehicle }}",
+            "external_factor": "={{ $json.external_factor }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false,
+              "readOnly": true
+            },
+            {
+              "id": "seller_shop_id",
+              "displayName": "seller_shop_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "seller_name",
+              "displayName": "seller_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "tracking_no",
+              "displayName": "tracking_no",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "latest_status_name",
+              "displayName": "latest_status_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_reason_code",
+              "displayName": "on_hold_reason_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_reason_name",
+              "displayName": "on_hold_reason_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_reason_name_th",
+              "displayName": "on_hold_reason_name_th",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fault_attribution",
+              "displayName": "fault_attribution",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_date",
+              "displayName": "on_hold_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_timestamp",
+              "displayName": "on_hold_timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_driver_id",
+              "displayName": "on_hold_driver_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "on_hold_driver_name",
+              "displayName": "on_hold_driver_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fleet_type",
+              "displayName": "fleet_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "driver_group",
+              "displayName": "driver_group",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "contract_type",
+              "displayName": "contract_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fleet_email",
+              "displayName": "fleet_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "agency_name",
+              "displayName": "agency_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "station_id",
+              "displayName": "station_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "station_name",
+              "displayName": "station_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "station_province_name",
+              "displayName": "station_province_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "station_district_name",
+              "displayName": "station_district_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "station_rm_zone",
+              "displayName": "station_rm_zone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "station_am_area",
+              "displayName": "station_am_area",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "rm_email",
+              "displayName": "rm_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "am_email",
+              "displayName": "am_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "hub_supervisor_email",
+              "displayName": "hub_supervisor_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "count_on_hold_pickup_attempt",
+              "displayName": "count_on_hold_pickup_attempt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "all_on_hold_pickup_timestamp",
+              "displayName": "all_on_hold_pickup_timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "link_fms_shipment",
+              "displayName": "link_fms_shipment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "pickup_task_id",
+              "displayName": "pickup_task_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "no_of_image",
+              "displayName": "no_of_image",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "image_url_1",
+              "displayName": "image_url_1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "image_url_2",
+              "displayName": "image_url_2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "image_url_3",
+              "displayName": "image_url_3",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cogs_amount",
+              "displayName": "cogs_amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "call_attempt",
+              "displayName": "call_attempt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "is_call_picked_up",
+              "displayName": "is_call_picked_up",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ring_duration_in_sec",
+              "displayName": "ring_duration_in_sec",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "call_duration_in_sec",
+              "displayName": "call_duration_in_sec",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "call_timestamp",
+              "displayName": "call_timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "call_status",
+              "displayName": "call_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "contact_phone_masked",
+              "displayName": "contact_phone_masked",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "result_call_log",
+              "displayName": "result_call_log",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "auditor",
+              "displayName": "auditor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "qc_name",
+              "displayName": "qc_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "image_1",
+              "displayName": "image_1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "guide",
+              "displayName": "guide",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "blank_blur_back",
+              "displayName": "blank_blur_back",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "location",
+              "displayName": "location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "call_log",
+              "displayName": "call_log",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "parcel",
+              "displayName": "parcel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "awb",
+              "displayName": "awb",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "vehicle",
+              "displayName": "vehicle",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "external_factor",
+              "displayName": "external_factor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "final_result",
+              "displayName": "final_result",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fail_reason",
+              "displayName": "fail_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        576,
+        16
+      ],
+      "id": "reconcile-apply-001",
+      "name": "Reconcile Apply NA",
+      "retryOnFail": false,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "neaMidkIwRRUvLlJ",
+          "name": "Google Sheets Credential"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        16
+      ],
+      "id": "89275008-cd2b-4424-b962-c0238421a661",
+      "name": "No Operation, do nothing",
+      "executeOnce": true
+    }
+  ],
+  "pinData": {
+    "Run Poll": [
+      {
+        "json": {},
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Run Poll": {
+      "main": [
+        [
+          {
+            "node": "Read Source",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Tracking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Tracking": {
+      "main": [
+        [
+          {
+            "node": "Select Pending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Pending": {
+      "main": [
+        [
+          {
+            "node": "Loop Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Batches": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Batch": {
+      "main": [
+        [
+          {
+            "node": "Is Completed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Completed": {
+      "main": [
+        [
+          {
+            "node": "Get Output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Output": {
+      "main": [
+        [
+          {
+            "node": "Process Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Done": {
+      "main": [
+        [
+          {
+            "node": "Loop Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Results": {
+      "main": [
+        [
+          {
+            "node": "Route by Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Type": {
+      "main": [
+        [
+          {
+            "node": "Update Results BBB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Results Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Results BBB": {
+      "main": [
+        [
+          {
+            "node": "Mark Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Results Audit": {
+      "main": [
+        [
+          {
+            "node": "Mark Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reconcile Read": {
+      "main": [
+        [
+          {
+            "node": "Reconcile Build NA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reconcile Build NA": {
+      "main": [
+        [
+          {
+            "node": "Reconcile Apply NA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reconcile Apply NA": {
+      "main": [
+        []
+      ]
+    },
+    "No Operation, do nothing": {
+      "main": [
+        [
+          {
+            "node": "Reconcile Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "timeSavedMode": "fixed",
+    "saveDataSuccessExecution": "none"
+  },
+  "versionId": "466ec9f9-3b6b-4996-8eee-4e584878d8a3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3bfda752d0f10c69b897a741380d5efa9dafee1419424a3fe0740f77110c613a"
+  },
+  "id": "gZ76baDDi8qp8QGt",
+  "tags": []
+}
