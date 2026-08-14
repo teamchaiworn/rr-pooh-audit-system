@@ -40,7 +40,7 @@ Run these in order. Do not skip ahead.
 For each claim the change/plan makes, answer:
 
 - **Does the code path you just traced actually produce that behavior?** Walk it explicitly. "It claims X. Path: A → B → C. At C, [observation]. Therefore [holds / doesn't hold]."
-- **What inputs / states would break it?** Edge cases, concurrent callers, error paths, partial failures, retries, empty/null/unicode/huge inputs, ordering assumptions.
+- **What inputs / states would break it?** Edge cases, concurrent callers, error paths, partial failures, retries, empty/null/unicode/huge inputs, ordering assumptions — and, for node/step-based systems, settings on a step that change behavior without changing the visible flow (error-handling mode per step, execution/ordering mode, how data is passed across a sub-call boundary). These don't show up as a visual diff, so they're easy to miss in a trace that only follows the obvious path.
 - **What does it silently change?** Performance, error semantics, observability, contract for other callers, on-disk / on-wire format.
 - **How is it tested?** Do the tests actually exercise the traced path, or do they pass while skipping it (mocks that hide the bug, asserts on intermediate state, happy path only)?
 
