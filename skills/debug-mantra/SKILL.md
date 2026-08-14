@@ -27,17 +27,20 @@ Build a runnable repro before anything else.
 - **Flaky repro** → the bug is not yet debuggable. Raise the rate first: loop the trigger, parallelise, add stress, narrow timing windows, inject sleeps. 50% flake is debuggable; 1% is not.
 - **No repro at all** → stop. Say so explicitly. Ask the user for env access, captured artifacts (HAR, log dump, core), or permission to instrument. Do **not** proceed to hypothesise.
 
-Target: a fast (1–5 s), deterministic pass/fail signal. Pin time, seed the RNG, freeze network, isolate filesystem.
+Target: a fast, deterministic pass/fail signal — 1–5 s where the runtime allows. For workflows built on visual/no-code or node-based platforms with external I/O (API calls, webhooks, queued or batched jobs), the full trigger-to-finish round-trip is not the repro unit — the fastest deterministic unit is the smallest node-level repro instead: freeze/pin the input at the suspected step and replay just that step. Pin time, seed the RNG, freeze network, isolate filesystem where applicable.
+
+- **Side effects during repro.** Before re-triggering anything with real side effects (writes, external calls, spawned jobs), check whether repeating it multiplies those side effects rather than just the signal. If it does, isolate or stub that step first — looping a side-effecting trigger is not the same as looping a pure one.
 
 ## 2. Know the fail path
 
 Once reproducible, find *where* the code breaks and *what stops it from breaking*. The differential narrows the search. Try in this order — escalate only when the prior tactic fails.
 
-1. **Attach a debugger.** If the env supports it, attach and step to the failure site. One breakpoint beats ten logs. Do this **before** turning any knobs.
+1. **Attach a debugger.** If the platform supports true step-through debugging, attach and step to the failure site — one breakpoint beats ten logs, and do this before turning any knobs. If it doesn't (most visual/no-code and node-based automation tools have no step-through debugger), the equivalent tactic is: freeze/pin the input at the suspected node, execute that single node in isolation, and inspect its output directly. Treat this as tactic 1 — only escalate to tactic 2 if it can't reach the bug.
 2. **Source trace + knob enumeration.** If no debugger (or it can't reach the bug), trace the code path end-to-end and list every knob that can influence the outcome:
    - config flags, env vars, feature toggles
    - branch conditions, input shape
    - timing, concurrency, build options
+   - for node/step-based systems: settings attached to a step that change behavior without changing the visible flow (error-handling mode per step, execution/ordering mode, how data is passed across a sub-call boundary)
    Each knob is a candidate axis to flip in the differential. Flip one at a time.
 3. **In-code instrumentation.** If outside knobs can't move the failure, go inside: `printf` / log statements at the suspected fail site, dump the relevant internal state. Tag every probe with a unique prefix (e.g. `[DBG-a4f2]`) so cleanup is a single grep. Let the trace show where reality diverges from your model.
 
